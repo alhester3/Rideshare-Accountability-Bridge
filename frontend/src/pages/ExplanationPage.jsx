@@ -17,15 +17,18 @@ export default function ExplanationPage() {
   const [confirmed, setConfirmed] = useState(false);
 
   const decision = decisions.find((d) => d.id === decisionId) ?? decisions[0];
+  if (!decision) {
+    return <section className="surface-card p-6">No decision data available yet.</section>;
+  }
   const user = users.find((u) => u.id === decision.userId);
 
   const submitClarification = () => {
-    addClarificationRequest({ decisionId: decision.id, message: clarifyMsg, userId: user.id });
+    addClarificationRequest({ decisionId: decision.id, message: clarifyMsg, userId: user?.id ?? "unknown" });
     setConfirmed(true);
     setClarifyMsg("");
   };
 
-  const goToAppeal = () => navigate(`/appeals?decisionId=${decision.id}&userId=${user.id}`);
+  const goToAppeal = () => navigate(`/appeals?decisionId=${decision.id}&userId=${user?.id ?? ""}`);
 
   const isAdmin = activeRole === "Corporate/Admin";
   const isDriver = activeRole === "Driver/Courier";
@@ -33,9 +36,9 @@ export default function ExplanationPage() {
   return (
     <div className="space-y-5">
       <h1 className="text-3xl font-bold">Decision Explanation</h1>
-      <section className="rounded-2xl p-4 bg-white shadow-soft">
-        <div className="text-sm text-slate-500">Decision ID</div>
-        <div className="font-bold">{decision.id}</div>
+      <section className="rounded-2xl p-4 bg-white shadow-soft text-slate-900">
+        <div className="text-sm text-slate-600">Decision ID</div>
+        <div className="font-bold text-lg">{decision.id}</div>
         <div className="mt-2 text-sm">{decision.summary}</div>
       </section>
 
@@ -65,7 +68,7 @@ export default function ExplanationPage() {
           <h2 className="font-semibold">Admin Detail</h2>
           <p className="text-sm text-slate-300 mt-2">Timestamp: {new Date(decision.timestamp).toLocaleString()} · System Version: v2.4.1</p>
           <p className="text-sm text-slate-300">Factors weighted by category: Demand, Availability, Geographic Load, Quality.</p>
-          <div className="mt-3 flex gap-2"><Link className="px-3 py-2 rounded-xl bg-amber-500 text-slate-900" to="/audit">Flag for Review</Link><button className="px-3 py-2 rounded-xl bg-emerald-500 text-slate-900">Mark Resolved</button></div>
+          <div className="mt-3 flex gap-2"><Link className="inline-flex items-center px-3 py-2 rounded-xl bg-amber-500 text-white font-semibold no-underline shadow-sm hover:bg-amber-400" to="/audit">Flag for Review</Link><button type="button" className="px-3 py-2 rounded-xl bg-emerald-500 text-white font-semibold shadow-sm hover:bg-emerald-400">Mark Resolved</button></div>
         </section>
       )}
 

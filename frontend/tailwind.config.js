@@ -6,7 +6,8 @@ export default {
       colors: {
         navy: "#0F172A",
         electric: "#3B82F6",
-        amber: "#F59E0B",
+        /* Do not override `amber` with a flat string — that removes the whole
+           amber-50…950 scale and breaks utilities like `bg-amber-500`. */
         success: "#10B981",
         riderbg: "#FAFAF9"
       },

@@ -1,30 +1,208 @@
-import { createContext, useContext, useMemo, useState } from "react";
-import { appeals as initialAppeals, auditLog as initialAuditLog, decisions as initialDecisions, fairnessMetrics, ridesAndTrips, roles, users as initialUsers } from "../data/sampleData";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { appeals as fallbackAppeals, auditLog as fallbackAudit, decisions as fallbackDecisions, fairnessMetrics as fallbackMetrics, ridesAndTrips as fallbackTrips, roles, users as fallbackUsers } from "../data/sampleData";
+import { appealsAPI, auditAPI, decisionsAPI, fairnessAPI, tripsAPI, usersAPI } from "../services/api";
 
 const AppContext = createContext(null);
 
+const toRole = (role) => {
+  if (role === "Rider") return "Rider/Customer";
+  if (role === "Driver") return "Driver/Courier";
+  if (role === "Restaurant") return "Restaurant Partner";
+  return "Corporate/Admin";
+};
+
+const mapTripToFrontend = (trip) => ({
+  id: trip.tripId,
+  userId: trip.userId,
+  driverId: trip.driverId,
+  decisionId: trip.linkedDecisionId || `decision-${trip.tripId.split("-")[1] ?? "001"}`,
+  date: new Date(trip.createdAt).toISOString().slice(0, 10),
+  price: Number(trip.price ?? 0),
+  baseFare: Number(trip.baseFare ?? 0),
+  earnings: Number(trip.driverEarnings ?? 0),
+  distance: Number(trip.distance ?? 0),
+  status: trip.status,
+  surge: Boolean(trip.surgeApplied),
+  surgeReason: trip.surgeReason,
+  location: trip.pickupLocation,
+  demand: trip.demandLevel || (trip.surgeApplied ? "High" : "Normal"),
+  eta: `${Math.max(12, Math.round(Number(trip.distance ?? 2) * 4))} min`
+});
+
+const computeFairnessScore = (user) => {
+  const ratingScore = ((Number(user.rating ?? 4.5) / 5) * 45);
+  const completionScore = ((Number(user.completionRate ?? 90) / 100) * 35);
+  const platform = Number(user.platformAverageEarnings ?? 710);
+  const weekly = Number(user.weeklyEarnings ?? platform);
+  const earningsDeltaPct = ((weekly - platform) / platform) * 100;
+  const earningsScore = Math.max(0, Math.min(20, 10 + (earningsDeltaPct / 2)));
+  return Math.round(ratingScore + completionScore + earningsScore);
+};
+
 export function AppProvider({ children }) {
   const [activeRole, setActiveRole] = useState("Rider/Customer");
-  const [users, setUsers] = useState(initialUsers);
-  const [decisions, setDecisions] = useState(initialDecisions);
-  const [appeals, setAppeals] = useState(initialAppeals);
-  const [auditEntries, setAuditEntries] = useState(initialAuditLog);
+  const [themeMode, setThemeMode] = useState("light");
+
+  const [users, setUsers] = useState(fallbackUsers);
+  const [decisions, setDecisions] = useState(fallbackDecisions);
+  const [appeals, setAppeals] = useState(fallbackAppeals);
+  const [auditEntries, setAuditEntries] = useState(fallbackAudit);
+  const [ridesAndTrips, setRidesAndTrips] = useState(fallbackTrips);
+  const [fairnessMetrics, setFairnessMetrics] = useState(fallbackMetrics);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+
   const [clarificationRequests, setClarificationRequests] = useState([]);
   const [selectedAuditFilter, setSelectedAuditFilter] = useState("");
 
-  const addAppeal = ({ userId, decisionId, reason, context }) => {
-    const newAppeal = {
-      id: `app-${Math.floor(Math.random() * 9000) + 400}`,
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", themeMode);
+    document.body.classList.toggle("admin-role", activeRole === "Corporate/Admin");
+  }, [themeMode, activeRole]);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      setApiError("");
+      try {
+        const [apiUsers, apiDecisions, apiAppeals, apiTrips, apiAudit, apiFairness] = await Promise.all([
+          usersAPI.getAll(),
+          decisionsAPI.getAll(),
+          appealsAPI.getAll(),
+          tripsAPI.getAll(),
+          auditAPI.getAll(),
+          fairnessAPI.getAll()
+        ]);
+
+        const mappedUsers = apiUsers.map((u) => ({
+          id: u.userId,
+          name: u.name,
+          email: u.email,
+          phone: u.phone,
+          role: toRole(u.role),
+          status: u.accountStatus,
+          zone: u.zone,
+          rating: Number(u.rating ?? 0),
+          completionRate: Number(u.completionRate ?? 0),
+          weeklyEarnings: Number(u.weeklyEarnings ?? 0),
+          platformAverageEarnings: Number(u.platformAverageEarnings ?? 0),
+          totalRides: Number(u.totalRides ?? 0),
+          totalTrips: Number(u.totalTrips ?? 0),
+          totalOrders: Number(u.totalOrders ?? 0),
+          adminLevel: u.adminLevel,
+          cuisineType: u.cuisineType,
+          averageOrderValue: Number(u.averageOrderValue ?? 0),
+          memberSince: u.memberSince ? new Date(u.memberSince).toISOString().slice(0, 10) : "",
+          lastActivity: new Date(u.lastActivity).toISOString().slice(0, 10),
+          fairnessScore: u.role === "Driver" ? computeFairnessScore(u) : undefined
+        }));
+
+        const mappedDecisions = apiDecisions.map((d) => ({
+          id: d.decisionId,
+          userId: d.userId,
+          tripId: d.tripId,
+          type: d.decisionType,
+          outcome: d.outcome,
+          timestamp: d.createdAt,
+          status: d.status,
+          factors: JSON.parse(d.factorsConsidered || "[]"),
+          excluded: JSON.parse(d.factorsExcluded || "[]"),
+          summary: d.plainLanguageSummary || `${d.decisionType} decision generated by ${d.systemVersion}.`
+        }));
+
+        const mappedAppeals = apiAppeals.map((a) => ({
+          id: a.appealId,
+          userId: a.userId,
+          decisionId: a.decisionId,
+          reason: a.reason,
+          context: a.description,
+          status: a.status === "UnderReview" ? "Under Review" : a.status,
+          submittedDate: new Date(a.submittedAt).toISOString().slice(0, 10),
+          type: toRole(a.userType),
+          assignedAdmin: a.assignedAdmin,
+          adminNotes: a.adminNotes,
+          resolution: a.resolution,
+          estimatedResolution: a.estimatedResolution,
+          resolvedAt: a.resolvedAt,
+          timeline: ["Submitted", ...(a.status !== "Pending" ? ["Under Review"] : []), ...(a.resolvedAt ? ["Decision Made", "Resolved"] : [])]
+        }));
+
+        const mappedTrips = apiTrips.map(mapTripToFrontend);
+
+        const mappedAudit = apiAudit.map((entry, i) => ({
+          id: entry.logId || `audit-${i}`,
+          decisionId: entry.decisionId,
+          appealId: entry.appealId,
+          userId: entry.performedBy || "system",
+          timestamp: entry.timestamp,
+          decisionType: mappedDecisions.find((d) => d.id === entry.decisionId)?.type || "AuditAction",
+          userType: "Corporate/Admin",
+          outcome: entry.actionTaken,
+          status: String(entry.actionTaken).toLowerCase().includes("flag") ? "Flagged" : "Reviewed",
+          detail: `${entry.notes} | performedBy:${entry.performedBy} | action:${entry.actionTaken}`
+        }));
+
+        const dynamicMetrics = apiFairness.map((m) => ({
+          id: m.metricId,
+          type: m.metricType,
+          zone: m.zone,
+          value: Number(m.value),
+          platformAverage: Number(m.platformAverage ?? 0),
+          secondaryValue: Number(m.secondaryValue ?? 0),
+          disparity: m.disparityText,
+          status: m.status
+        }));
+
+        setUsers(mappedUsers);
+        setDecisions(mappedDecisions);
+        setAppeals(mappedAppeals);
+        setRidesAndTrips(mappedTrips);
+        setAuditEntries(mappedAudit);
+        setFairnessMetrics({ ...fallbackMetrics, dynamic: dynamicMetrics });
+      } catch (error) {
+        console.error(error);
+        setApiError("API unavailable. Showing fallback demo data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const toggleThemeMode = () => {
+    setThemeMode((prev) => (prev === "light" ? "dark" : "light"));
+  };
+
+  const addAppeal = async ({ userId, decisionId, reason, context }) => {
+    const user = users.find((u) => u.id === userId);
+    const payload = {
+      appealId: `appeal-${Math.floor(Math.random() * 900 + 100)}`,
       userId,
       decisionId,
+      userType: user?.role?.includes("Driver") ? "Driver" : user?.role?.includes("Restaurant") ? "Restaurant" : "Rider",
       reason,
-      context,
-      status: "Pending",
-      submittedDate: new Date().toISOString().slice(0, 10),
-      type: users.find((u) => u.id === userId)?.role ?? activeRole,
-      timeline: ["Submitted"]
+      description: context,
+      status: "Pending"
     };
-    setAppeals((prev) => [newAppeal, ...prev]);
+
+    try {
+      const created = await appealsAPI.submit(payload);
+      setAppeals((prev) => [{
+        id: created.appealId,
+        userId: created.userId,
+        decisionId: created.decisionId,
+        reason: created.reason,
+        context: created.description,
+        status: "Pending",
+        submittedDate: new Date(created.submittedAt).toISOString().slice(0, 10),
+        type: user?.role ?? activeRole,
+        timeline: ["Submitted"]
+      }, ...prev]);
+    } catch {
+      setApiError("Could not submit appeal right now.");
+    }
   };
 
   const addClarificationRequest = ({ decisionId, message, userId }) => {
@@ -34,66 +212,104 @@ export function AppProvider({ children }) {
     ]);
   };
 
-  const updateAppealStatus = (appealId, action) => {
-    const statusMap = {
-      approve: "Resolved",
-      deny: "Resolved",
-      escalate: "Under Review",
-      moreInfo: "Under Review"
-    };
+  const updateAppealStatus = async (appealId, action) => {
+    const statusMap = { approve: "Approved", deny: "Denied", escalate: "Escalated", moreInfo: "UnderReview" };
+    const newStatus = statusMap[action] ?? "UnderReview";
+
+    try {
+      if (action === "approve" || action === "deny") {
+        await appealsAPI.resolve(appealId, { status: newStatus, resolution: action === "approve" ? "Approved by admin" : "Denied by admin" });
+      } else {
+        await appealsAPI.updateStatus(appealId, newStatus, "Status updated from queue");
+      }
+    } catch {
+      setApiError("Failed to update appeal status.");
+    }
 
     setAppeals((prev) =>
       prev.map((appeal) => {
         if (appeal.id !== appealId) return appeal;
-        const status = statusMap[action] ?? appeal.status;
+        const friendly = newStatus === "UnderReview" ? "Under Review" : (newStatus === "Approved" || newStatus === "Denied" ? "Resolved" : newStatus);
         const timeline = [...appeal.timeline];
-        if (!timeline.includes("Under Review") && status === "Under Review") timeline.push("Under Review");
-        if (status === "Resolved") {
+        if (!timeline.includes("Under Review") && friendly !== "Pending") timeline.push("Under Review");
+        if (friendly === "Resolved") {
           if (!timeline.includes("Decision Made")) timeline.push("Decision Made");
           if (!timeline.includes("Resolved")) timeline.push("Resolved");
         }
-        return { ...appeal, status, timeline };
+        return { ...appeal, status: friendly, timeline, resolution: action === "approve" ? "Approved by admin" : appeal.resolution };
       })
     );
 
     if (action === "approve") {
       const appeal = appeals.find((a) => a.id === appealId);
       if (appeal) {
-        setDecisions((prev) => prev.map((d) => (d.id === appeal.decisionId ? { ...d, outcome: "Overturned", status: "Closed" } : d)));
+        try { await decisionsAPI.overturn(appeal.decisionId); } catch { setApiError("Appeal approved, but decision overturn sync failed."); }
+        setDecisions((prev) => prev.map((d) => (d.id === appeal.decisionId ? { ...d, outcome: "Overturned", status: "Overturned" } : d)));
       }
     }
   };
 
-  const toggleDecisionFlag = (decisionId) => {
+  const toggleDecisionFlag = async (decisionId) => {
+    try { await decisionsAPI.flag(decisionId); } catch { setApiError("Failed to toggle decision flag."); }
     setAuditEntries((prev) => prev.map((entry) => (entry.decisionId === decisionId ? { ...entry, status: entry.status === "Flagged" ? "Reviewed" : "Flagged" } : entry)));
   };
 
-  const updateUserStatus = (userId, status) => {
+  const updateUserStatus = async (userId, status) => {
+    try {
+      const user = users.find((u) => u.id === userId);
+      if (!user) return;
+      await usersAPI.update(userId, {
+        userId: user.id,
+        name: user.name,
+        email: user.email || `${user.id}@email.com`,
+        phone: user.phone,
+        role: user.role.includes("Driver") ? "Driver" : user.role.includes("Restaurant") ? "Restaurant" : user.role.includes("Admin") ? "Admin" : "Rider",
+        accountStatus: status,
+        memberSince: user.memberSince,
+        totalRides: user.totalRides,
+        totalTrips: user.totalTrips,
+        totalOrders: user.totalOrders,
+        rating: user.rating,
+        completionRate: user.completionRate,
+        zone: user.zone,
+        weeklyEarnings: user.weeklyEarnings,
+        platformAverageEarnings: user.platformAverageEarnings,
+        cuisineType: user.cuisineType,
+        averageOrderValue: user.averageOrderValue,
+        adminLevel: user.adminLevel,
+        createdAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString()
+      });
+    } catch {
+      setApiError("Failed to update user status.");
+    }
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status } : u)));
   };
 
-  const value = useMemo(
-    () => ({
-      roles,
-      activeRole,
-      setActiveRole,
-      users,
-      decisions,
-      appeals,
-      auditEntries,
-      ridesAndTrips,
-      fairnessMetrics,
-      clarificationRequests,
-      selectedAuditFilter,
-      setSelectedAuditFilter,
-      addAppeal,
-      addClarificationRequest,
-      updateAppealStatus,
-      toggleDecisionFlag,
-      updateUserStatus
-    }),
-    [activeRole, users, decisions, appeals, auditEntries, clarificationRequests, selectedAuditFilter]
-  );
+  const value = useMemo(() => ({
+    roles,
+    activeRole,
+    setActiveRole,
+    themeMode,
+    setThemeMode,
+    toggleThemeMode,
+    users,
+    decisions,
+    appeals,
+    auditEntries,
+    ridesAndTrips,
+    fairnessMetrics,
+    isLoading,
+    apiError,
+    clarificationRequests,
+    selectedAuditFilter,
+    setSelectedAuditFilter,
+    addAppeal,
+    addClarificationRequest,
+    updateAppealStatus,
+    toggleDecisionFlag,
+    updateUserStatus
+  }), [activeRole, themeMode, users, decisions, appeals, auditEntries, ridesAndTrips, fairnessMetrics, isLoading, apiError, clarificationRequests, selectedAuditFilter]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

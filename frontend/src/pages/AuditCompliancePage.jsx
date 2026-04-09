@@ -22,9 +22,9 @@ export default function AuditCompliancePage() {
       <h1 className="text-3xl font-bold">Audit & Compliance Center</h1>
       <section className="admin-glass rounded-2xl p-4">
         <div className="flex flex-wrap gap-2 mb-3">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} className="rounded-xl p-2 text-slate-900" placeholder="Search user, decision, keyword" />
-          <select className="rounded-xl p-2 text-slate-900" value={type} onChange={(e) => setType(e.target.value)}><option>All</option>{[...new Set(auditEntries.map((a) => a.decisionType))].map((item) => <option key={item}>{item}</option>)}</select>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-xl p-2 text-slate-900" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} className="rounded-xl p-2 bg-slate-950/70 text-slate-100 border border-slate-600 placeholder:text-slate-400" placeholder="Search user, decision, keyword" />
+          <select className="rounded-xl p-2 bg-slate-950/70 text-slate-100 border border-slate-600" value={type} onChange={(e) => setType(e.target.value)}><option>All</option>{[...new Set(auditEntries.map((a) => a.decisionType))].map((item) => <option key={item}>{item}</option>)}</select>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-xl p-2 bg-slate-950/70 text-slate-100 border border-slate-600" />
           <button className="px-3 py-2 rounded-xl bg-electric text-white">Export PDF</button>
         </div>
         <div className="space-y-2">

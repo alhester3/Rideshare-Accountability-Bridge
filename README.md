@@ -1,16 +1,58 @@
 # Rideshare-Accountability-Bridge
 
-Project scaffold for a vanilla JavaScript frontend + ASP.NET Core Web API backend with SQLite.
+The Accountability Bridge is a fairness and transparency portal for rideshare and delivery decisions, built to provide understandable explanations and real recourse without exposing proprietary algorithms. It gives riders, drivers, restaurant partners, and admins tailored views so trust, operations, and compliance can work in one system.
 
-## Standards
+## Folder Map
 
-Primary project standards are documented in `PROJECT_GUIDELINES.md`.
+```text
+Rideshare-Accountability-Bridge/
+├── frontend/
+├── backend/
+│   ├── Controllers/
+│   │   ├── Admin/
+│   │   ├── Rider/
+│   │   ├── Driver/
+│   │   ├── Restaurant/
+│   │   ├── Shared/
+│   │   └── _examples/
+│   ├── Models/
+│   ├── Data/
+│   ├── Services/
+│   ├── Migrations/
+│   ├── Properties/
+│   ├── Program.cs
+│   ├── appsettings.json
+│   └── appsettings.Development.json
+├── docs/
+├── PROJECT_GUIDELINES.md
+└── README.md
+```
 
-Supporting documentation lives in `docs/`.
+## Who Works On What
 
-## Structure
+| Team Member | Role Focus | Folders to Work In |
+|-------------|------------|--------------------|
+| Jaimee | Testing/BA | `docs/`, `frontend/src/pages`, `backend/Services` |
+| Anna Lee | ERD/Data Model | `backend/Models`, `backend/Data`, `backend/Migrations` |
+| Cassie | Clarity/Readability | `docs/`, `frontend/src/components`, `README.md` |
 
-- `frontend/`: Single-page app (`index.html`) and JavaScript modules.
-- `backend/`: .NET 8 Web API project and SQLite-related data access setup.
-- `backend/api/`: Intended location for `database.db`.
-- `docs/`: Architecture, API contract, and standards references.
+## Run Locally
+
+### Backend API
+```bash
+cd backend
+dotnet restore
+dotnet run --urls http://localhost:5000
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm start
+```
+
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:5173`
+
+Both should run at the same time for full functionality.

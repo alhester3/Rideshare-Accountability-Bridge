@@ -23,7 +23,7 @@ export default function FairnessCenterPage() {
         <h2 className="font-semibold text-lg">What We Do NOT Use</h2>
         <div className="grid md:grid-cols-3 gap-3 mt-3">{["Race", "Gender", "Age", "Religion", "Disability", "Political affiliation"].map((item) => <div key={item} className="flex gap-2 items-center"><CheckCircle2 size={16} className="text-emerald-500" /> {item}</div>)}</div>
       </section>
-      <section className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-5">
+      <section className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-5 text-slate-900">
         <p className="font-semibold text-lg inline-flex gap-2"><ShieldCheck size={18} /> We don't show you the algorithm. We show you the boundaries we set around it.</p>
       </section>
     </div>
