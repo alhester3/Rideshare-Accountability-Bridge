@@ -35,7 +35,7 @@ function RoleSwitcher() {
 }
 
 export default function AppLayout({ children }) {
-  const { activeRole, themeMode, toggleThemeMode, isLoading, apiError } = useAppContext();
+  const { activeRole, themeMode, toggleThemeMode } = useAppContext();
   const isAdmin = activeRole === "Corporate/Admin";
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -86,19 +86,11 @@ export default function AppLayout({ children }) {
                 </div>
               </div>
             </header>
-            <main className="page-shell py-6">
-              {isLoading && <div className="surface-card p-3 mb-3 text-sm">Loading live data...</div>}
-              {apiError && <div className="surface-card p-3 mb-3 text-sm border-amber-300 bg-amber-50 text-amber-800">{apiError}</div>}
-              {children}
-            </main>
+            <main className="page-shell py-6">{children}</main>
           </div>
         </div>
       ) : (
-        <main className="page-shell py-6">
-          {isLoading && <div className="surface-card p-3 mb-3 text-sm">Loading live data...</div>}
-          {apiError && <div className="surface-card p-3 mb-3 text-sm border-amber-300 bg-amber-50 text-amber-800">{apiError}</div>}
-          {children}
-        </main>
+        <main className="page-shell py-6">{children}</main>
       )}
     </div>
   );

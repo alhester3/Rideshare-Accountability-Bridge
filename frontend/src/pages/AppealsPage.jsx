@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 
-const statuses = ["Pending", "Under Review", "Resolved"];
+const statuses = ["Pending", "Under Review", "Escalated", "Resolved"];
 
 function Timeline({ timeline }) {
   const steps = ["Submitted", "Under Review", "Decision Made", "Resolved"];
